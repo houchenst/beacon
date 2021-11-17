@@ -243,6 +243,7 @@ class SuperNet(nn.Module):
         return ValLosses
 
     def fit(self, TrainDataLoader, Optimizer=None, Objective=nn.MSELoss(), TrainDevice='cpu', ValDataLoader=None):
+        print("ENTERING FIT")
         if self.Optimizer is None:
             self.Optimizer = optim.Adam(self.parameters(), lr=self.Config.Args.learning_rate, weight_decay=1e-5)  # PARAM
         if Optimizer is not None:
