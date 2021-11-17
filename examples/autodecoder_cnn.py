@@ -62,6 +62,7 @@ def evaluateTrain(Args, TrainData, Net, TestDevice, LatVecs):
 
     '''
     Net = Net.to(TestDevice)
+    LatVecs = LatVecs.to(TestDevice)
     nSamples = min(Args.infer_samples, len(TrainData))
     print('[ INFO ]: Evaluating ', nSamples, ' training samples')
 
