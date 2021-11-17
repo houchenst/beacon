@@ -67,7 +67,7 @@ def evaluateTrain(Args, TrainData, Net, TestDevice, LatVecs):
 
     for i in range(nSamples):
         Index, _, _ = TrainData[i]
-        Embedding = LatVecs[Index]
+        Embedding = LatVecs(Index)
         PredImage = Net(Embedding.unsqueeze_(0)).detach()
         plt.subplot(2, 1, 1)
         plt.imshow(PredImage.cpu().numpy().squeeze(), cmap='gray')
