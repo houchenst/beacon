@@ -66,15 +66,18 @@ class SuperLoss(nn.Module):
         self.LossVals = [0.0] * len(self.Losses)
         self.LossValsWeighted = [0.0] * len(self.Losses)
 
-    def forward(self, output, target):
+    def forward(self, output, target, embeddings=None):
         self.cleanUp()
-        return self.computeLoss(output, target)
+        return self.computeLoss(output, target, embeddings)
 
-    def computeLoss(self, output, target):
+    def computeLoss(self, output, target, embeddings=None):
         TotalLossVal = 0.0
 
         for Ctr, (l, w) in enumerate(zip(self.Losses, self.Weights), 0):
-            LossVal = l.forward(output, target)
+            if embeddings is None:
+                LossVal = l.forward(output, target)
+            else:
+                LossVal = l.forward(output, target, embeddings)
             self.LossVals[Ctr] = LossVal
             self.LossValsWeighted[Ctr] = w * LossVal
             TotalLossVal += self.LossValsWeighted[Ctr]
@@ -278,21 +281,34 @@ class SuperNet(nn.Module):
                 EpochLosses = [] # For all batches in an epoch
                 EpochSeparateLosses = []  # For all batches in an epoch
                 Tic = utils.getCurrentEpochTime()
-                for i, (Data, Targets) in enumerate(TrainDataLoader, 0):  # Get each batch
+                for i, Examples in enumerate(TrainDataLoader, 0):  # Get each batch
+                    if LatVecs is not None:#handle autodecoder
+                        Indices, Data, Targets = Examples
+                        Embeddings = LatVecs[Indices]
+                    else:
+                        Data, Targets = Examples
                     # if LatVecs is not None: #handle autodecoder
-                    # print("Showingg data and target")
-                    # print(Data)
-                    # print("target")
-                    # print(Targets)
+                    #     if len(Data) == 1:
+                    #         indices = Data[0]
+                    #         Embeddings = LatVecs[indices]
+                    #     elif len(Data) == 2:
+                    #         indices, Data = Data
+                    #         Embeddings = LatVecs[indices]
+                    #     else:
+                    #         raise RuntimeError('Expected tuple of (embedding indices, data) or (embedding indices,) when using AutoDecoder.')
+                            
                     DataTD = utils.sendToDevice(Data, TrainDevice)
                     TargetsTD = utils.sendToDevice(Targets, TrainDevice)
 
                     self.Optimizer.zero_grad()
 
                     # Forward, backward, optimize
-                    Output = self.forward(DataTD)
-
-                    Loss = ObjectiveFunc(Output, TargetsTD)
+                    if LatVecs is None:
+                        Output = self.forward(DataTD)
+                        Loss = ObjectiveFunc(Output, TargetsTD)
+                    else:
+                        Output = self.forward(DataTD, Embeddings)
+                        Loss = ObjectiveFunc(Output, TargetsTD, Embeddings)
                     Loss.backward()
                     self.Optimizer.step()
                     EpochLosses.append(Loss.item())
