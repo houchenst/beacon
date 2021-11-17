@@ -173,7 +173,7 @@ class SuperNet(nn.Module):
         self.SeparateLossesHistory = []
         self.Optimizer = None
 
-    def loadCheckpoint(self, Path=None, Device='cpu'):
+    def loadCheckpoint(self, Path=None, Device='cpu', LatVecs=None):
         if Path is None:
             self.ExptDirPath = os.path.join(utils.expandTilde(self.Config.Args.output_dir), self.Config.Args.expt_name)
             print('[ INFO ]: Loading from latest checkpoint.')
@@ -183,8 +183,14 @@ class SuperNet(nn.Module):
             CheckpointDict = utils.loadPyTorchCheckpoint(Path)
 
         self.load_state_dict(CheckpointDict['ModelStateDict'])
+        if LatVecs is not None:
+            if 'LatVecs' in CheckpointDict:
+                LatVecs.load_state_dict(CheckpointDict['LatVecs'])
+            else:
+                print('[ INFO ]: Could not find latent vectors in checkpoint')
+        
 
-    def setupCheckpoint(self, TrainDevice):
+    def setupCheckpoint(self, TrainDevice, LatVecs=None):
         LatestCheckpointDict = None
         AllCheckpoints = glob.glob(os.path.join(self.ExptDirPath, '*.tar'))
         if len(AllCheckpoints) > 0:
@@ -207,6 +213,11 @@ class SuperNet(nn.Module):
                     self.SeparateLossesHistory = LatestCheckpointDict['SeparateLossesHistory']
                 else:
                     self.SeparateLossesHistory = self.LossHistory
+                if LatVecs is not None:
+                    if 'LatVecs' in LatestCheckpointDict:
+                        LatVecs.load_state_dict(LatestCheckpointDict['LatVecs'])
+                    else:
+                        print('[ INFO ]: Latent vectors not found in last checkpoint. Using reinitialized values.')
 
                 # Move optimizer state to GPU if needed. See https://github.com/pytorch/pytorch/issues/2830
                 if TrainDevice != 'cpu' and self.Optimizer is not None:
@@ -242,8 +253,7 @@ class SuperNet(nn.Module):
 
         return ValLosses
 
-    def fit(self, TrainDataLoader, Optimizer=None, Objective=nn.MSELoss(), TrainDevice='cpu', ValDataLoader=None):
-        print("ENTERING FIT")
+    def fit(self, TrainDataLoader, Optimizer=None, Objective=nn.MSELoss(), TrainDevice='cpu', ValDataLoader=None, LatVecs=None):
         if self.Optimizer is None:
             self.Optimizer = optim.Adam(self.parameters(), lr=self.Config.Args.learning_rate, weight_decay=1e-5)  # PARAM
         if Optimizer is not None:
@@ -253,10 +263,13 @@ class SuperNet(nn.Module):
         if isinstance(ObjectiveFunc, SuperLoss) == False:
             ObjectiveFunc = SuperLoss(Losses=[ObjectiveFunc], Weights=[1.0])  # Cast to SuperLoss
 
-        self.setupCheckpoint(TrainDevice)
+        self.setupCheckpoint(TrainDevice, LatVecs)
 
         print('[ INFO ]: Training on {}'.format(TrainDevice))
         self.to(TrainDevice)
+        #Move latent vectors to GPU if needed
+        if TrainDevice != 'cpu' and LatVecs is not None:
+            LatVecs = LatVecs.to(TrainDevice)
         CurrLegend = ['Train loss', *ObjectiveFunc.Names]
 
         AllTic = utils.getCurrentEpochTime()
@@ -266,6 +279,11 @@ class SuperNet(nn.Module):
                 EpochSeparateLosses = []  # For all batches in an epoch
                 Tic = utils.getCurrentEpochTime()
                 for i, (Data, Targets) in enumerate(TrainDataLoader, 0):  # Get each batch
+                    # if LatVecs is not None: #handle autodecoder
+                    print("Showingg data and target")
+                    print(Data)
+                    print("target")
+                    print(Targets)
                     DataTD = utils.sendToDevice(Data, TrainDevice)
                     TargetsTD = utils.sendToDevice(Targets, TrainDevice)
 
@@ -317,27 +335,27 @@ class SuperNet(nn.Module):
 
                 # Always save checkpoint after an epoch. Will be replaced each epoch. This is independent of requested checkpointing
                 if self.Config.Args.no_save == False:
-                    self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='~'*3)
+                    self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='~'*3, LatVecs=LatVecs)
 
                 isLastLoop = (Epoch == self.Config.Args.epochs-1) and (i == len(TrainDataLoader)-1)
                 if (Epoch + 1) % self.SaveFrequency == 0 or isTerminateEarly or isLastLoop:
-                    self.saveCheckpoint(Epoch, CurrLegend)
+                    self.saveCheckpoint(Epoch, CurrLegend, LatVecs=LatVecs)
                     if isTerminateEarly:
                         break
             except (KeyboardInterrupt, SystemExit):
                 print('\n[ INFO ]: KeyboardInterrupt detected. Saving checkpoint.')
-                self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='$'*3)
+                self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='$'*3, LatVecs=LatVecs)
                 break
             except Exception as e:
                 print(traceback.format_exc())
                 print('\n[ WARN ]: Exception detected. *NOT* saving checkpoint. {}'.format(e))
-                # self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='$'*3)
+                # self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='$'*3, LatVecs=LatVecs)
                 break
 
         AllToc = utils.getCurrentEpochTime()
         print('[ INFO ]: All done in {}.'.format(utils.getTimeDur((AllToc - AllTic) * 1e-6)))
 
-    def saveCheckpoint(self, Epoch, CurrLegend, TimeString='humanlocal', PrintStr='*'*3):
+    def saveCheckpoint(self, Epoch, CurrLegend, TimeString='humanlocal', PrintStr='*'*3, LatVecs=None):
         CheckpointDict = {
             'Name': self.Config.Args.expt_name,
             'ModelStateDict': self.state_dict(),
@@ -348,6 +366,11 @@ class SuperNet(nn.Module):
             'Epoch': self.StartEpoch + Epoch + 1,
             'SavedTimeZ': utils.getZuluTimeString(),
         }
+
+        # Save latent vectors if they are used
+        if LatVecs is not None:
+            CheckpointDict["LatVecs"] = LatVecs.state_dict()
+        
         OutFilePath = utils.savePyTorchCheckpoint(CheckpointDict, self.ExptDirPath, TimeString=TimeString)
         # ptUtils.saveLossesCurve(self.LossHistory, self.ValLossHistory, out_path=os.path.splitext(OutFilePath)[0] + '.png',
         #                         xlim = [0, int(self.Config.Args.epochs + self.StartEpoch)], legend=CurrLegend, title=self.Config.Args.expt_name)
