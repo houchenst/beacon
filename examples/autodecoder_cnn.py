@@ -69,6 +69,8 @@ def evaluateTrain(Args, TrainData, Net, TestDevice, LatVecs):
 
     for i in range(nSamples):
         Index, _, Image = TrainData[i]
+        print(f"Index is {Index}")
+        print(f"Lat Vec is {LatVecs(Index)}")
         Index = Index.to(TestDevice)
         Embedding = LatVecs(Index)
         PredImage = Net(dummyData, Embedding.unsqueeze_(0)).detach()
