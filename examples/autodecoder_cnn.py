@@ -112,7 +112,7 @@ if __name__ == '__main__':
         loss = SuperLoss(Losses=[ADReconstructionLoss(), ADRegularizationLoss()], Weights=[1.0,1.0], Names=["Reconstruction", "Regularization"])
 
         # Train
-        SampleNet.fit(TrainDataLoader, Objective=nn.MSELoss(), TrainDevice=TrainDevice, LatVecs=LatVecs)
+        SampleNet.fit(TrainDataLoader, Objective=loss, TrainDevice=TrainDevice, LatVecs=LatVecs)
     elif Args.mode == 'infer':
         SampleNet.loadCheckpoint()
 

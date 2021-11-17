@@ -68,7 +68,7 @@ class SuperLoss(nn.Module):
 
     def forward(self, output, target, embeddings=None):
         self.cleanUp()
-        return self.computeLoss(output, target, embeddings=embeddings)
+        return self.computeLoss(output, target, embeddings)
 
     def computeLoss(self, output, target, embeddings=None):
         TotalLossVal = 0.0
@@ -308,7 +308,7 @@ class SuperNet(nn.Module):
                         Loss = ObjectiveFunc(Output, TargetsTD)
                     else:
                         Output = self.forward(DataTD, Embeddings)
-                        Loss = ObjectiveFunc(Output, TargetsTD, embeddings=Embeddings)
+                        Loss = ObjectiveFunc(Output, TargetsTD, Embeddings)
                     Loss.backward()
                     self.Optimizer.step()
                     EpochLosses.append(Loss.item())
