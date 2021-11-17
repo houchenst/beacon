@@ -57,7 +57,24 @@ class ADRegularizationLoss(nn.Module):
             return torch.tensor(0)
         return Loss * self.regLambda
 
+def evaluateTrain(Args, TrainData, Net, TestDevice, LatVecs):
+    '''
 
+    '''
+    Net = Net.to(TestDevice)
+    nSamples = min(Args.infer_samples, len(TrainData))
+    print('[ INFO ]: Evaluating ', nSamples, ' training samples')
+
+    for i in range(nSamples):
+        Index, _, _ = TrainData[i]
+        Embedding = LatVecs[Index]
+        PredImage = Net(Embedding.unsqueeze_(0)).detach()
+        plt.subplot(2, 1, 1)
+        plt.imshow(PredImage.cpu().numpy().squeeze(), cmap='gray')
+        plt.subplot(2, 1, 2)
+        plt.imshow(PredImage.cpu().numpy().squeeze(), cmap='gray')
+        plt.pause(1)
+    
 def infer(Args, TestData, Net, TestDevice):
     TestNet = Net.to(TestDevice)
     nSamples = min(Args.infer_samples, len(TestData))
@@ -79,9 +96,8 @@ Parser = argparse.ArgumentParser(description='Sample code that uses the beacon f
 Parser.add_argument('--arch', help='Architecture to use.', choices=['SimpleCNN'], default='SimpleCNN')
 Parser.add_argument('--latent-size', type=int, default=32, help="Size of latent space")
 InputGroup = Parser.add_mutually_exclusive_group()
-InputGroup.add_argument('--mode', help='Operation mode.', choices=['train', 'infer'])
+InputGroup.add_argument('--mode', help='Operation mode.', choices=['train', 'infer', 'evaluate'])
 InputGroup.add_argument('--infer-samples', help='Number of samples to use during testing.', default=30, type=int)
-
 
 MNISTTrans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
 
@@ -121,3 +137,20 @@ if __name__ == '__main__':
         print('[ INFO ]: Data has', len(TestData), 'samples.')
 
         infer(Args, TestData, SampleNet, TestDevice)
+
+    elif Args.mode == 'evaluate':
+        TrainData = MNISTAutoDecoderDataset(root=SampleNet.Config.Args.input_dir, train=True, download=True, transform=Trans)
+        print('[ INFO ]: Data has', len(TrainData), 'samples.')
+
+        # TODO: change initialization parameters
+        LatVecs = nn.Embedding(len(TrainData), Args.latent_size, max_norm=0.001)
+        torch.nn.init.normal_(
+            LatVecs.weight.data,
+            0.0,
+            0.0001 / math.sqrt(Args.latent_size),
+        )
+        TestDevice = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        SampleNet.loadCheckpoint(LatVecs=LatVecs)
+
+        evaluateTrain(Args, TrainData, SampleNet, TestDevice, LatVecs)
+
