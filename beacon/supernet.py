@@ -284,7 +284,7 @@ class SuperNet(nn.Module):
                 for i, Examples in enumerate(TrainDataLoader, 0):  # Get each batch
                     if LatVecs is not None:#handle autodecoder
                         Indices, Data, Targets = Examples
-                        Embeddings = LatVecs[Indices]
+                        Embeddings = LatVecs(Indices)
                     else:
                         Data, Targets = Examples
                     # if LatVecs is not None: #handle autodecoder
