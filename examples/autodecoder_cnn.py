@@ -63,6 +63,7 @@ def evaluateTrain(Args, TrainData, Net, TestDevice, LatVecs):
     '''
     Net = Net.to(TestDevice)
     LatVecs = LatVecs.to(TestDevice)
+    dummyData = torch.tensor([]).to(TestDevice)
     nSamples = min(Args.infer_samples, len(TrainData))
     print('[ INFO ]: Evaluating ', nSamples, ' training samples')
 
@@ -70,7 +71,7 @@ def evaluateTrain(Args, TrainData, Net, TestDevice, LatVecs):
         Index, _, _ = TrainData[i]
         Index = Index.to(TestDevice)
         Embedding = LatVecs(Index)
-        PredImage = Net(Embedding.unsqueeze_(0)).detach()
+        PredImage = Net(dummyData, Embedding.unsqueeze_(0)).detach()
         plt.subplot(2, 1, 1)
         plt.imshow(PredImage.cpu().numpy().squeeze(), cmap='gray')
         plt.subplot(2, 1, 2)
