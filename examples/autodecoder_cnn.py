@@ -91,7 +91,7 @@ if __name__ == '__main__':
         Parser.print_help()
         exit()
 
-    SampleNet = CAD.SimpleCAD()
+    SampleNet = CAD.SimpleCAD(LatentSize=Args.latent_size)
     Trans = MNISTTrans
 
     if Args.mode == 'train':
