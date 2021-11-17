@@ -280,10 +280,10 @@ class SuperNet(nn.Module):
                 Tic = utils.getCurrentEpochTime()
                 for i, (Data, Targets) in enumerate(TrainDataLoader, 0):  # Get each batch
                     # if LatVecs is not None: #handle autodecoder
-                    print("Showingg data and target")
-                    print(Data)
-                    print("target")
-                    print(Targets)
+                    # print("Showingg data and target")
+                    # print(Data)
+                    # print("target")
+                    # print(Targets)
                     DataTD = utils.sendToDevice(Data, TrainDevice)
                     TargetsTD = utils.sendToDevice(Targets, TrainDevice)
 

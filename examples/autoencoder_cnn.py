@@ -60,6 +60,7 @@ if __name__ == '__main__':
         TrainData = MNISTSpecialDataset(root=SampleNet.Config.Args.input_dir, train=True, download=True, transform=Trans)
         print('[ INFO ]: Data has', len(TrainData), 'samples.')
         TrainDataLoader = torch.utils.data.DataLoader(TrainData, batch_size=SampleNet.Config.Args.batch_size, shuffle=True, num_workers=1)
+        print(f"Using batch size: {SampleNet.Config.Args.batch_size}")
 
         # Train
         SampleNet.fit(TrainDataLoader, Objective=nn.MSELoss(), TrainDevice=TrainDevice)
