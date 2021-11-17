@@ -17,7 +17,7 @@ REG_LAMBDA = 1e-4
 class MNISTAutoDecoderDataset(MNIST):
     def __getitem__(self, idx):
         Image, Label = super().__getitem__(idx)
-        return idx, torch.tensor([], dtype=float), Image
+        return torch.tensor(idx), torch.tensor([], dtype=float), Image
 
 class ADReconstructionLoss(nn.Module):
     '''
@@ -67,6 +67,7 @@ def evaluateTrain(Args, TrainData, Net, TestDevice, LatVecs):
 
     for i in range(nSamples):
         Index, _, _ = TrainData[i]
+        Index = Index.to(TestDevice)
         Embedding = LatVecs(Index)
         PredImage = Net(Embedding.unsqueeze_(0)).detach()
         plt.subplot(2, 1, 1)
