@@ -68,12 +68,12 @@ def evaluateTrain(Args, TrainData, Net, TestDevice, LatVecs):
     print('[ INFO ]: Evaluating ', nSamples, ' training samples')
 
     for i in range(nSamples):
-        Index, _, _ = TrainData[i]
+        Index, _, Image = TrainData[i]
         Index = Index.to(TestDevice)
         Embedding = LatVecs(Index)
         PredImage = Net(dummyData, Embedding.unsqueeze_(0)).detach()
         plt.subplot(2, 1, 1)
-        plt.imshow(PredImage.cpu().numpy().squeeze(), cmap='gray')
+        plt.imshow(Image.cpu().numpy().squeeze(), cmap='gray')
         plt.subplot(2, 1, 2)
         plt.imshow(PredImage.cpu().numpy().squeeze(), cmap='gray')
         plt.pause(1)
