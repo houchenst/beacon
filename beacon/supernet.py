@@ -284,7 +284,6 @@ class SuperNet(nn.Module):
                 for i, Examples in enumerate(TrainDataLoader, 0):  # Get each batch
                     if LatVecs is not None:#handle autodecoder
                         Indices, Data, Targets = Examples
-                        Embeddings = LatVecs(Indices)
                     else:
                         Data, Targets = Examples
                     # if LatVecs is not None: #handle autodecoder
@@ -299,6 +298,10 @@ class SuperNet(nn.Module):
                             
                     DataTD = utils.sendToDevice(Data, TrainDevice)
                     TargetsTD = utils.sendToDevice(Targets, TrainDevice)
+                    if LatVecs is not None:
+                        IndicesTD = utils.sendToDevice(Indices, TrainDevice)
+                        Embeddings = LatVecs(IndicesTD)
+
 
                     self.Optimizer.zero_grad()
 
