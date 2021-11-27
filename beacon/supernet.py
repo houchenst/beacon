@@ -302,6 +302,7 @@ class SuperNet(nn.Module):
                         IndicesTD = utils.sendToDevice(Indices, TrainDevice)
                         Embeddings = LatVecs(IndicesTD)
                         for x in Embeddings:
+                            print(x)
                             print(f"Embedding gradient is {x.grad}")
 
 
