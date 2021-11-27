@@ -313,6 +313,10 @@ class SuperNet(nn.Module):
                         Output = self.forward(DataTD, Embeddings)
                         Loss = ObjectiveFunc(Output, TargetsTD, Embeddings)
                     Loss.backward()
+                    for i in range(10):
+                        param = LatVecs(torch.tensor(i*1201))
+                        print(f"Parameter {i*1201} gradient-")
+                        print(param.grad)
                     self.Optimizer.step()
                     EpochLosses.append(Loss.item())
                     EpochSeparateLosses.append(ObjectiveFunc.getItems())
