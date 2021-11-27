@@ -301,9 +301,6 @@ class SuperNet(nn.Module):
                     if LatVecs is not None:
                         IndicesTD = utils.sendToDevice(Indices, TrainDevice)
                         Embeddings = LatVecs(IndicesTD)
-                        for x in Embeddings:
-                            print(x)
-                            print(f"Embedding gradient is {x.grad}")
 
 
                     self.Optimizer.zero_grad()
@@ -316,7 +313,10 @@ class SuperNet(nn.Module):
                         Output = self.forward(DataTD, Embeddings)
                         Loss = ObjectiveFunc(Output, TargetsTD, Embeddings)
                     Loss.backward()
-                    
+                    if LatVecs is not None:
+                        for x in Embeddings:
+                            print(x)
+                            print(f"Embedding gradient is {x.grad}")
                     self.Optimizer.step()
                     EpochLosses.append(Loss.item())
                     EpochSeparateLosses.append(ObjectiveFunc.getItems())
