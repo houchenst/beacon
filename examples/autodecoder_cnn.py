@@ -130,10 +130,12 @@ if __name__ == '__main__':
             0.0001 / math.sqrt(Args.latent_size),
         )
 
+        print(f"Lat Vecs need loss {LatVecs.requires_grad_}")
+
         loss = SuperLoss(Losses=[ADReconstructionLoss(), ADRegularizationLoss()], Weights=[1.0,1.0], Names=["Reconstruction", "Regularization"])
 
         # Train
-        SampleNet.fit(TrainDataLoader, Objective=loss, TrainDevice=TrainDevice, LatVecs=LatVecs)
+        # SampleNet.fit(TrainDataLoader, Objective=loss, TrainDevice=TrainDevice, LatVecs=LatVecs)
     elif Args.mode == 'infer':
         SampleNet.loadCheckpoint()
 
