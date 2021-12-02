@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import sys
 import argparse
 
+# TODO: change back imports
 from beacon.models import CAE, SegNet
+# from models import CAE, SegNet
 
 # Make both input and target be the same
 class MNISTSpecialDataset(MNIST):
@@ -17,7 +19,7 @@ class MNISTSpecialDataset(MNIST):
 
 
 def infer(Args, TestData, Net, TestDevice):
-    TestNet = Net.to(TestDevice)
+    TestNet = Net.to(TestDevice, {})
     nSamples = min(Args.infer_samples, len(TestData))
     print('[ INFO ]: Testing on', nSamples, 'samples')
 
@@ -63,6 +65,7 @@ if __name__ == '__main__':
         print(f"Using batch size: {SampleNet.Config.Args.batch_size}")
 
         # Train
+
         SampleNet.fit(TrainDataLoader, Objective=nn.MSELoss(), TrainDevice=TrainDevice)
     elif Args.mode == 'infer':
         SampleNet.loadCheckpoint()

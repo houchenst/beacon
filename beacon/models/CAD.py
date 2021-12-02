@@ -7,7 +7,9 @@ import sys
 FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 
+# TODO: change imports back
 from beacon import supernet
+# import supernet
 
 class SimpleCAD(supernet.SuperNet):
     def __init__(self, Args=None, DataParallelDevs=None, LatentSize=256):
@@ -23,9 +25,11 @@ class SimpleCAD(supernet.SuperNet):
             nn.Tanh()
         )
 
-    def forward(self, data, embeddings):
-        x = self.linear1(embeddings)
+    def forward(self, data, otherParameters):
+        if not "Latent Vectors" in otherParameters:
+                raise RuntimeError('Autodecoder could not find ''Latent Vectors'' in input parameters')
+        x = self.linear1(otherParameters["Latent Vectors"](data))
         x = self.linear2(x)
         x = torch.reshape(x, (-1, 8, 2, 2)) # b, 8, 2, 2   <-- input shape for decoder
         x = self.decoder(x)
-        return x
+        return x, otherParameters["Latent Vectors"](data)

@@ -7,7 +7,9 @@ import sys
 FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 
+# TODO: change back imports
 from beacon import supernet
+# import supernet
 
 class SimpleCAE(supernet.SuperNet):
     def __init__(self, Args=None, DataParallelDevs=None):
@@ -29,7 +31,7 @@ class SimpleCAE(supernet.SuperNet):
             nn.Tanh()
         )
 
-    def forward(self, x):
+    def forward(self, x, otherParameters):
         x = self.encoder(x)
         x = self.decoder(x)
         return x
@@ -58,7 +60,7 @@ class DeepCAE(supernet.SuperNet):
         self.decoder = self.Decoder(OutputChannels=InputChannels)
         self.fcbn = FCBottleNeck(self.encoder.FeatureSize) # Bottleneck identical to DeepPECAE
 
-    def forward(self, x):
+    def forward(self, x, otherParameters):
         z = self.encoder(x)
         z = self.fcbn(z)
         y = self.decoder(z)
@@ -141,7 +143,7 @@ class DeepCAE5(DeepCAE):
     def __init__(self, Args=None, DataParallelDevs=None, InputChannels=1):
         super().__init__(Args, DataParallelDevs=DataParallelDevs, InputChannels=InputChannels)
 
-    def forward(self, x):
+    def forward(self, x, otherParameters):
         BatchSize = x.shape[0]
         SetSize = x.shape[1]
         nChannels = x.shape[2]
@@ -168,7 +170,7 @@ class DeepPECAE(DeepCAE):
         self.decoder = self.Decoder()
         self.permeq = self.PELayer(self.encoder.FeatureSize)
 
-    def forward(self, x):
+    def forward(self, x, otherParameters):
         BatchSize = x.shape[0]
         SetSize = x.shape[1]
         nChannels = x.shape[2]
@@ -214,7 +216,7 @@ class DeepPECAE(DeepCAE):
 
             return MN
 
-        def forward(self, x):
+        def forward(self, x, otherParameters):
             # print('Permeq size', x.size())
 
             # Permutation equivariant layer is just a fully connected layer where the input features are max normalized

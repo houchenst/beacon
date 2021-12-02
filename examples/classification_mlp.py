@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import sys
 import argparse
 
+# todo change back imports
 from beacon.models import ClassificationNet
+# from models import ClassificationNet
 
 def infer(Args, TestData, Net, TestDevice):
     TestNet = Net.to(TestDevice)

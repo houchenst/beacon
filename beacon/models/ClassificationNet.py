@@ -10,9 +10,10 @@ FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 
 import utils
-import nets
+# TODO: what is nets? nets.Supernet?
+import supernet
 
-class SimpleClassNet(nets.SuperNet):
+class SimpleClassNet(supernet.SuperNet):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
@@ -20,7 +21,7 @@ class SimpleClassNet(nets.SuperNet):
         self.fc1 = nn.Linear(4 * 4 * 50, 500)
         self.fc2 = nn.Linear(500, 10)
 
-    def forward(self, x):
+    def forward(self, x, otherParameters):
         x = F.relu(self.conv1(x))
         x = F.max_pool2d(x, 2, 2)
         x = F.relu(self.conv2(x))

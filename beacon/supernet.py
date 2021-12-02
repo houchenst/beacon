@@ -66,18 +66,15 @@ class SuperLoss(nn.Module):
         self.LossVals = [0.0] * len(self.Losses)
         self.LossValsWeighted = [0.0] * len(self.Losses)
 
-    def forward(self, output, target, embeddings=None):
+    def forward(self, output, target):
         self.cleanUp()
-        return self.computeLoss(output, target, embeddings)
+        return self.computeLoss(output, target)
 
-    def computeLoss(self, output, target, embeddings=None):
+    def computeLoss(self, output, target):
         TotalLossVal = 0.0
 
         for Ctr, (l, w) in enumerate(zip(self.Losses, self.Weights), 0):
-            if embeddings is None:
-                LossVal = l.forward(output, target)
-            else:
-                LossVal = l.forward(output, target, embeddings)
+            LossVal = l.forward(output, target)
             self.LossVals[Ctr] = LossVal
             self.LossValsWeighted[Ctr] = w * LossVal
             TotalLossVal += self.LossValsWeighted[Ctr]
@@ -176,7 +173,7 @@ class SuperNet(nn.Module):
         self.SeparateLossesHistory = []
         self.Optimizer = None
 
-    def loadCheckpoint(self, Path=None, Device='cpu', LatVecs=None):
+    def loadCheckpoint(self, Path=None, Device='cpu', OtherParameters=[], OtherParameterNames=[]):
         if Path is None:
             self.ExptDirPath = os.path.join(utils.expandTilde(self.Config.Args.output_dir), self.Config.Args.expt_name)
             print('[ INFO ]: Loading from latest checkpoint.')
@@ -186,14 +183,15 @@ class SuperNet(nn.Module):
             CheckpointDict = utils.loadPyTorchCheckpoint(Path)
 
         self.load_state_dict(CheckpointDict['ModelStateDict'])
-        if LatVecs is not None:
-            if 'LatVecs' in CheckpointDict:
-                LatVecs.load_state_dict(CheckpointDict['LatVecs'])
+
+        for i, param_name in enumerate(OtherParameterNames):
+            if param_name in CheckpointDict:
+                OtherParameters[i].load_state_dict(CheckpointDict[param_name])
             else:
-                print('[ INFO ]: Could not find latent vectors in checkpoint')
+                print(f"[ INFO ]: Could not find parameter '{param_name}' in checkpoint")
         
 
-    def setupCheckpoint(self, TrainDevice, LatVecs=None):
+    def setupCheckpoint(self, TrainDevice, OtherParameters=[], OtherParameterNames=[]):
         LatestCheckpointDict = None
         AllCheckpoints = glob.glob(os.path.join(self.ExptDirPath, '*.tar'))
         if len(AllCheckpoints) > 0:
@@ -216,11 +214,12 @@ class SuperNet(nn.Module):
                     self.SeparateLossesHistory = LatestCheckpointDict['SeparateLossesHistory']
                 else:
                     self.SeparateLossesHistory = self.LossHistory
-                if LatVecs is not None:
-                    if 'LatVecs' in LatestCheckpointDict:
-                        LatVecs.load_state_dict(LatestCheckpointDict['LatVecs'])
+
+                for i, param_name in enumerate(OtherParameterNames):
+                    if param_name in LatestCheckpointDict:
+                        OtherParameters[i].load_state_dict(LatestCheckpointDict[param_name])
                     else:
-                        print('[ INFO ]: Latent vectors not found in last checkpoint. Using reinitialized values.')
+                        print(f"[ INFO ]: Parameter '{param_name}' not found in last checkpoint. Using reinitialized values.")
 
                 # Move optimizer state to GPU if needed. See https://github.com/pytorch/pytorch/issues/2830
                 if TrainDevice != 'cpu' and self.Optimizer is not None:
@@ -256,9 +255,16 @@ class SuperNet(nn.Module):
 
         return ValLosses
 
-    def fit(self, TrainDataLoader, Optimizer=None, Objective=nn.MSELoss(), TrainDevice='cpu', ValDataLoader=None, LatVecs=None):
+    def fit(self, TrainDataLoader, Optimizer=None, Objective=nn.MSELoss(), TrainDevice='cpu', ValDataLoader=None, OtherParameters=[], OtherParameterNames=[]):
+        if len(OtherParameters) != len(OtherParameterNames):
+                raise RuntimeError('fit() OtherParameters and OtherParameterNames don''t match.')
+        for i, param in enumerate(OtherParameters):
+            if not issubclass(type(param), nn.Module):
+                raise RuntimeError(f"fit() OtherParameter '{OtherParameters[i]}' must be an instance of nn.Module")
+
         if self.Optimizer is None:
             self.Optimizer = optim.Adam(self.parameters(), lr=self.Config.Args.learning_rate, weight_decay=1e-5)  # PARAM
+            # TODO: Do we want to include the other parameters in the optimizer by default?
         if Optimizer is not None:
             self.Optimizer = Optimizer
 
@@ -266,13 +272,20 @@ class SuperNet(nn.Module):
         if isinstance(ObjectiveFunc, SuperLoss) == False:
             ObjectiveFunc = SuperLoss(Losses=[ObjectiveFunc], Weights=[1.0])  # Cast to SuperLoss
 
-        self.setupCheckpoint(TrainDevice, LatVecs)
+        self.setupCheckpoint(TrainDevice, OtherParameters, OtherParameterNames)
 
         print('[ INFO ]: Training on {}'.format(TrainDevice))
         self.to(TrainDevice)
-        #Move latent vectors to GPU if needed
-        if TrainDevice != 'cpu' and LatVecs is not None:
-            LatVecs = LatVecs.to(TrainDevice)
+
+        #Move other parameters to GPU if needed
+        if TrainDevice != 'cpu':
+            GPUParameters = []
+            for param in OtherParameters:
+                GPUParameters.append(param.to(TrainDevice))
+            OtherParameters = GPUParameters
+        
+        OtherParameterDict = {OtherParameterNames[i]: OtherParameters[i] for i in range(len(OtherParameterNames))}
+
         CurrLegend = ['Train loss', *ObjectiveFunc.Names]
 
         AllTic = utils.getCurrentEpochTime()
@@ -282,41 +295,23 @@ class SuperNet(nn.Module):
                 EpochSeparateLosses = []  # For all batches in an epoch
                 Tic = utils.getCurrentEpochTime()
                 for i, Examples in enumerate(TrainDataLoader, 0):  # Get each batch
-                    if LatVecs is not None:#handle autodecoder
-                        Indices, Data, Targets = Examples
-                    else:
-                        Data, Targets = Examples
-                    # if LatVecs is not None: #handle autodecoder
-                    #     if len(Data) == 1:
-                    #         indices = Data[0]
-                    #         Embeddings = LatVecs[indices]
-                    #     elif len(Data) == 2:
-                    #         indices, Data = Data
-                    #         Embeddings = LatVecs[indices]
-                    #     else:
-                    #         raise RuntimeError('Expected tuple of (embedding indices, data) or (embedding indices,) when using AutoDecoder.')
+                    Data, Targets = Examples
                             
                     DataTD = utils.sendToDevice(Data, TrainDevice)
                     TargetsTD = utils.sendToDevice(Targets, TrainDevice)
-                    if LatVecs is not None:
-                        IndicesTD = utils.sendToDevice(Indices, TrainDevice)
-                        Embeddings = LatVecs(IndicesTD)
-
 
                     self.Optimizer.zero_grad()
 
                     # Forward, backward, optimize
-                    if LatVecs is None:
-                        Output = self.forward(DataTD)
-                        Loss = ObjectiveFunc(Output, TargetsTD)
-                    else:
-                        Output = self.forward(DataTD, Embeddings)
-                        Loss = ObjectiveFunc(Output, TargetsTD, Embeddings)
+                    Output = self.forward(DataTD, OtherParameterDict)
+                    Loss = ObjectiveFunc(Output, TargetsTD)
                     Loss.backward()
-                    if LatVecs is not None:
-                        for x in Embeddings:
-                            print(x)
-                            print(f"Embedding gradient is {x.grad}")
+
+                    # print(type(Data))
+                    # print(Data)
+                    # print(f"lat vec: {OtherParameterDict['Latent Vectors'].weight}")
+                    # print(f"lat vec grad: {OtherParameterDict['Latent Vectors'].weight.grad}")
+
                     self.Optimizer.step()
                     EpochLosses.append(Loss.item())
                     EpochSeparateLosses.append(ObjectiveFunc.getItems())
@@ -358,27 +353,27 @@ class SuperNet(nn.Module):
 
                 # Always save checkpoint after an epoch. Will be replaced each epoch. This is independent of requested checkpointing
                 if self.Config.Args.no_save == False:
-                    self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='~'*3, LatVecs=LatVecs)
+                    self.saveCheckpoint(Epoch, CurrLegend, OtherParameterDict, TimeString='eot', PrintStr='~'*3)
 
                 isLastLoop = (Epoch == self.Config.Args.epochs-1) and (i == len(TrainDataLoader)-1)
                 if (Epoch + 1) % self.SaveFrequency == 0 or isTerminateEarly or isLastLoop:
-                    self.saveCheckpoint(Epoch, CurrLegend, LatVecs=LatVecs)
+                    self.saveCheckpoint(Epoch, CurrLegend, OtherParameterDict)
                     if isTerminateEarly:
                         break
             except (KeyboardInterrupt, SystemExit):
                 print('\n[ INFO ]: KeyboardInterrupt detected. Saving checkpoint.')
-                self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='$'*3, LatVecs=LatVecs)
+                self.saveCheckpoint(Epoch, CurrLegend, OtherParameterDict, TimeString='eot', PrintStr='$'*3)
                 break
             except Exception as e:
                 print(traceback.format_exc())
                 print('\n[ WARN ]: Exception detected. *NOT* saving checkpoint. {}'.format(e))
-                # self.saveCheckpoint(Epoch, CurrLegend, TimeString='eot', PrintStr='$'*3, LatVecs=LatVecs)
+                # self.saveCheckpoint(Epoch, CurrLegend, OtherParameterDict, TimeString='eot', PrintStr='$'*3)
                 break
 
         AllToc = utils.getCurrentEpochTime()
         print('[ INFO ]: All done in {}.'.format(utils.getTimeDur((AllToc - AllTic) * 1e-6)))
 
-    def saveCheckpoint(self, Epoch, CurrLegend, TimeString='humanlocal', PrintStr='*'*3, LatVecs=None):
+    def saveCheckpoint(self, Epoch, CurrLegend, OtherParameterDict, TimeString='humanlocal', PrintStr='*'*3):
         CheckpointDict = {
             'Name': self.Config.Args.expt_name,
             'ModelStateDict': self.state_dict(),
@@ -389,10 +384,9 @@ class SuperNet(nn.Module):
             'Epoch': self.StartEpoch + Epoch + 1,
             'SavedTimeZ': utils.getZuluTimeString(),
         }
-
-        # Save latent vectors if they are used
-        if LatVecs is not None:
-            CheckpointDict["LatVecs"] = LatVecs.state_dict()
+        
+        for key in OtherParameterDict:
+            CheckpointDict[key] = OtherParameterDict[key].state_dict()
         
         OutFilePath = utils.savePyTorchCheckpoint(CheckpointDict, self.ExptDirPath, TimeString=TimeString)
         # ptUtils.saveLossesCurve(self.LossHistory, self.ValLossHistory, out_path=os.path.splitext(OutFilePath)[0] + '.png',
@@ -407,6 +401,6 @@ class SuperNet(nn.Module):
         # print('[ INFO ]: Checkpoint saved.')
         print(PrintStr) # Checkpoint saved. 50 + 3 characters [>]
 
-    def forward(self, x):
+    def forward(self, x, otherParameters):
         print('[ WARN ]: This is an identity network. Override this in a derived class.')
         return x
