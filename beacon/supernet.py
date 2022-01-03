@@ -230,7 +230,7 @@ class SuperNet(nn.Module):
             else:
                 print('[ INFO ]: Experiment names do not match. Training from scratch.')
 
-    def validate(self, ValDataLoader, Objective, Device='cpu'):
+    def validate(self, ValDataLoader, Objective, Device='cpu', OtherParameterDict={}):
         self.eval()         #switch to evaluation mode
         ValLosses = []
         Tic = utils.getCurrentEpochTime()
@@ -239,7 +239,7 @@ class SuperNet(nn.Module):
             DataTD = utils.sendToDevice(Data, Device)
             TargetsTD = utils.sendToDevice(Targets, Device)
 
-            Output = self.forward(DataTD)
+            Output = self.forward(DataTD, OtherParameterDict)
             Loss = Objective(Output, TargetsTD)
             ValLosses.append(Loss.item())
 
@@ -346,7 +346,7 @@ class SuperNet(nn.Module):
                 SepMeans[:] = [x / len(EpochLosses) for x in SepMeans]
                 self.SeparateLossesHistory.append(SepMeans)
                 if ValDataLoader is not None:
-                    ValLosses = self.validate(ValDataLoader, Objective, TrainDevice)
+                    ValLosses = self.validate(ValDataLoader, Objective, TrainDevice, OtherParameterDict)
                     self.ValLossHistory.append(np.mean(np.asarray(ValLosses)))
                     # print('Last epoch val loss - {:.16f}'.format(self.ValLossHistory[-1]))
                     CurrLegend = ['Train loss', 'Val loss', *ObjectiveFunc.Names]
