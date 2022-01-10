@@ -75,6 +75,9 @@ class SuperLoss(nn.Module):
         TotalLossVal = 0.0
 
         for Ctr, (l, w, custom) in enumerate(zip(self.Losses + self.CustomLosses, self.Weights, [False]*len(self.Losses) + [True]*len(self.CustomLosses)), 0):
+            print(Ctr)
+            print(l)
+            print(custom)
             if not custom:
                 LossVal = l.forward(output, target, otherInputs={})
             else:
