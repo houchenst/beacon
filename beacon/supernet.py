@@ -244,7 +244,7 @@ class SuperNet(nn.Module):
             TargetsTD = utils.sendToDevice(Targets, Device)
 
             Output = self.forward(DataTD, OtherParameterDict)
-            Loss = Objective(Output, TargetsTD)
+            Loss = Objective(Output, TargetsTD, otherInputs={"data": DataTD, "model": self})
             ValLosses.append(Loss.item())
 
             # Print stats
