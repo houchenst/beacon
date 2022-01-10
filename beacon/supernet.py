@@ -31,17 +31,18 @@ class netMSELoss(nn.Module):
 
 
 class SuperLoss(nn.Module):
-    def __init__(self, Losses=[], Weights=[], Names=[]):
+    def __init__(self, Losses=[], Weights=[], Names=[], CustomLosses=[]):
         super().__init__()
         if not Losses: # empty list
             self.Losses = [netMSELoss()]
             self.Weights = [1.0]
             self.Names = ['Default MSE Loss']
         else:
-            if len(Losses) != len(Weights):
+            if len(Losses) + len(CustomLosses) != len(Weights):
                 raise RuntimeError('SuperLoss() given Losses and Weights don''t match.')
 
             self.Losses = Losses
+            self.CustomLosses = CustomLosses
             self.Weights = Weights
             self.Names = ['Subloss ' + str(i).zfill(2) for i in range(len(self.Losses))]
             for Ctr, n in enumerate(Names, 0):
@@ -49,7 +50,7 @@ class SuperLoss(nn.Module):
             self.cleanUp()
 
     def __len__(self):
-        return len(self.Losses)
+        return len(self.Losses) + len(self.CustomLosses)
 
     def getItems(self, withoutWeights=False):
         RetLossValsFloat = []
@@ -63,18 +64,21 @@ class SuperLoss(nn.Module):
         return RetLossValsFloat
 
     def cleanUp(self):
-        self.LossVals = [0.0] * len(self.Losses)
-        self.LossValsWeighted = [0.0] * len(self.Losses)
+        self.LossVals = [0.0] * (len(self.Losses) + len(self.CustomLosses))
+        self.LossValsWeighted = [0.0] * (len(self.Losses) + len(self.CustomLosses))
 
-    def forward(self, output, target):
+    def forward(self, output, target, otherInputs={}):
         self.cleanUp()
-        return self.computeLoss(output, target)
+        return self.computeLoss(output, target, otherInputs=otherInputs)
 
-    def computeLoss(self, output, target):
+    def computeLoss(self, output, target, otherInputs={}):
         TotalLossVal = 0.0
 
-        for Ctr, (l, w) in enumerate(zip(self.Losses, self.Weights), 0):
-            LossVal = l.forward(output, target)
+        for Ctr, (l, w, custom) in enumerate(zip(self.Losses + self.CustomLosses, self.Weights, [False]*len(self.Losses) + [True]*len(self.CustomLosses)), 0):
+            if not custom:
+                LossVal = l.forward(output, target, otherInputs={})
+            else:
+                LossVal = l.forward(output, target, otherInputs=otherInputs)
             self.LossVals[Ctr] = LossVal
             self.LossValsWeighted[Ctr] = w * LossVal
             TotalLossVal += self.LossValsWeighted[Ctr]
@@ -304,7 +308,7 @@ class SuperNet(nn.Module):
 
                     # Forward, backward, optimize
                     Output = self.forward(DataTD, OtherParameterDict)
-                    Loss = ObjectiveFunc(Output, TargetsTD)
+                    Loss = ObjectiveFunc(Output, TargetsTD, otherInputs={"data": DataTD, "model": self})
                     Loss.backward()
 
                     # print(type(Data))
