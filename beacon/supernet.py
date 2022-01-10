@@ -44,7 +44,7 @@ class SuperLoss(nn.Module):
             self.Losses = Losses
             self.CustomLosses = CustomLosses
             self.Weights = Weights
-            self.Names = ['Subloss ' + str(i).zfill(2) for i in range(len(self.Losses))]
+            self.Names = ['Subloss ' + str(i).zfill(2) for i in range(len(self.Losses)+len(self.CustomLosses))]
             for Ctr, n in enumerate(Names, 0):
                 self.Names[Ctr] = n
             self.cleanUp()
